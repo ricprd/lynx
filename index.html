@@ -160,7 +160,7 @@
         
         .link-info {
             flex: 1;
-            min-width: 0;
+            min-width: 0; /* Added to prevent overflow with long URLs */
         }
         
         .link-title {
@@ -170,10 +170,9 @@
         }
 
         .link-title a {
-
-            word-break: break-all;
+            word-break: break-all; /* Add this to wrap long titles/URLs */
         }
-	    
+        
         .link-url {
             color: #7f8c8d;
             font-size: 12px;
@@ -483,6 +482,9 @@
             try {
                 const response = await fetch(config.scriptUrl, {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json' // Added header for CORS
+                    },
                     body: JSON.stringify({
                         action: 'archive',
                         row: row
