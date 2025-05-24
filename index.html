@@ -119,6 +119,16 @@
         button.delete:hover {
             background: #c0392b;
         }
+
+        button.readd {
+            background: #3498db; /* Blue */
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        button.readd:hover {
+            background: #2980b9;
+        }
         
         .tabs {
             display: flex;
@@ -468,7 +478,9 @@
                         <div class="link-actions">
                             ${type === 'unread' ? 
                                 `<button class="archive" onclick="archiveLink(${link.row})">Archive</button>` : 
-                                `<button class="delete" onclick="deleteLink(${link.row})">Delete</button>`
+                                `<!-- Archived link actions -->
+                                 <button class="readd" onclick="unarchiveLink(${link.row})">Re-add</button>
+                                 <button class="delete" onclick="deleteLink(${link.row})">Delete</button>`
                             }
                         </div>
                     </div>
@@ -593,6 +605,64 @@
                 } catch (error) {
                     showMessage('Error deleting link: ' + error.message, 'error');
                 }
+            }
+        }
+
+        async function unarchiveLink(row) {
+            try {
+                // Use JSONP to avoid CORS issues
+                const callbackName = 'callback_' + Date.now();
+                const params = new URLSearchParams({
+                    action: 'unarchive',
+                    row: row,
+                    callback: callbackName
+                });
+
+                // Create promise that resolves when callback is called
+                const result = await new Promise((resolve, reject) => {
+                    // Set up callback function
+                    window[callbackName] = function(data) {
+                        resolve(data);
+                        // Cleanup
+                        delete window[callbackName];
+                        if (document.head.contains(script)) {
+                           document.head.removeChild(script);
+                        }
+                    };
+
+                    // Create script tag
+                    const script = document.createElement('script');
+                    script.src = `${config.scriptUrl}?${params.toString()}`;
+                    script.onerror = function() {
+                        reject(new Error('Network error during unarchive'));
+                        delete window[callbackName];
+                        if (document.head.contains(script)) {
+                           document.head.removeChild(script);
+                        }
+                    };
+
+                    // Add timeout
+                    setTimeout(() => {
+                        if (window[callbackName]) {
+                            reject(new Error('Unarchive request timeout'));
+                            delete window[callbackName];
+                            if (document.head.contains(script)) {
+                                document.head.removeChild(script);
+                            }
+                        }
+                    }, 10000); // 10 second timeout
+
+                    document.head.appendChild(script);
+                });
+
+                if (result.success) {
+                    showMessage('Link moved back to To Read!', 'success');
+                    loadLinks(); // Reload links to reflect the change
+                } else {
+                    throw new Error(result.error || 'Failed to unarchive');
+                }
+            } catch (error) {
+                showMessage('Error unarchiving link: ' + error.message, 'error');
             }
         }
         
