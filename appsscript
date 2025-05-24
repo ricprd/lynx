@@ -1,0 +1,101 @@
+function doPost(e) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const data = JSON.parse(e.postData.contents);
+    
+    if (data.action === 'add') {
+      const timestamp = new Date().toISOString();
+      sheet.appendRow([data.url, data.title, timestamp, false]);
+      return createCORSResponse({success: true});
+        
+    } else if (data.action === 'archive') {
+      const rowNum = parseInt(data.row);
+      sheet.getRange(rowNum, 4).setValue(true);
+      return createCORSResponse({success: true});
+        
+    } else if (data.action === 'delete') {
+      const rowNum = parseInt(data.row);
+      sheet.deleteRow(rowNum);
+      return createCORSResponse({success: true});
+    }
+    
+  } catch (error) {
+    return createCORSResponse({error: error.toString()});
+  }
+}
+
+function doGet(e) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const params = e.parameter;
+    
+    if (params.action === 'add') {
+      const timestamp = new Date().toISOString();
+      sheet.appendRow([params.url, params.title, timestamp, false]);
+      
+      // Handle JSONP callback
+      if (params.callback) {
+        return ContentService
+          .createTextOutput(`${params.callback}(${JSON.stringify({success: true})})`)
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      
+      return createCORSResponse({success: true});
+        
+    } else if (params.action === 'archive') {
+      const rowNum = parseInt(params.row);
+      sheet.getRange(rowNum, 4).setValue(true);
+      
+      if (params.callback) {
+        return ContentService
+          .createTextOutput(`${params.callback}(${JSON.stringify({success: true})})`)
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      
+      return createCORSResponse({success: true});
+        
+    } else if (params.action === 'delete') {
+      const rowNum = parseInt(params.row);
+      sheet.deleteRow(rowNum);
+      
+      if (params.callback) {
+        return ContentService
+          .createTextOutput(`${params.callback}(${JSON.stringify({success: true})})`)
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      
+      return createCORSResponse({success: true});
+    }
+    
+    const errorResponse = {error: 'No valid action specified'};
+    if (params.callback) {
+      return ContentService
+        .createTextOutput(`${params.callback}(${JSON.stringify(errorResponse)})`)
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    
+    return createCORSResponse(errorResponse);
+    
+  } catch (error) {
+    const errorResponse = {error: error.toString()};
+    
+    if (e.parameter.callback) {
+      return ContentService
+        .createTextOutput(`${e.parameter.callback}(${JSON.stringify(errorResponse)})`)
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    
+    return createCORSResponse(errorResponse);
+  }
+}
+
+function createCORSResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+}
