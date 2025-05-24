@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lynx</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .config {
+            padding: 20px;
+            background: #fff3cd;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .config h3 {
+            margin-bottom: 10px;
+            color: #856404;
+        }
+        
+        .config-form {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+        
+        .config-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .config-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .add-form {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        input[type="url"], input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        button:disabled {
+            background: #bbb;
+            cursor: not-allowed;
+        }
+        
+        button.archive {
+            background: #27ae60;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        button.archive:hover {
+            background: #229954;
+        }
+        
+        button.delete {
+            background: #e74c3c;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        button.delete:hover {
+            background: #c0392b;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #ecf0f1;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 14px;
+        }
+        
+        .tab.active {
+            background: white;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        
+        .links-container {
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .link-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background: white;
+        }
+        
+        .link-info {
+            flex: 1;
+        }
+        
+        .link-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #2c3e50;
+        }
+        
+        .link-url {
+            color: #7f8c8d;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        
+        .link-date {
+            color: #95a5a6;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+        
+        .link-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #7f8c8d;
+            padding: 40px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .success {
+            background: #d1edff;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .help {
+            font-size: 11px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Lynx</h1>
+            <p>Save links to read later - Powered by Google Sheets</p>
+        </div>
+        
+        <div class="config" id="configSection">
+            <h3>Setup Required</h3>
+            <p>Enter your Google Sheets information:</p>
+            <div class="config-form">
+                <div class="config-group">
+                    <label for="sheetId">Sheet ID:</label>
+                    <input type="text" id="sheetId" placeholder="From your sheet URL...">
+                    <div class="help">Found in your sheet URL between /d/ and /edit</div>
+                </div>
+                <div class="config-group">
+                    <label for="scriptUrl">Apps Script URL:</label>
+                    <input type="text" id="scriptUrl" placeholder="Your deployed web app URL...">
+                    <div class="help">From Apps Script deployment</div>
+                </div>
+                <button onclick="saveConfig()">Save & Load</button>
+            </div>
+        </div>
+        
+        <div id="mainApp" style="display: none;">
+            <div class="add-form">
+                <div class="form-group">
+                    <input type="url" id="urlInput" placeholder="Paste URL here..." required>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="titleInput" placeholder="Optional title...">
+                </div>
+                <button onclick="addLink()">Save Link</button>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('unread')">To Read</button>
+                <button class="tab" onclick="showTab('archived')">Archived</button>
+            </div>
+            
+            <div id="unreadTab" class="links-container">
+                <div class="loading">Click "Save & Load" above to get started</div>
+            </div>
+            
+            <div id="archivedTab" class="links-container" style="display: none;">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'unread';
+        let config = {};
+        let allData = [];
+        
+        // Load saved config on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedConfig = localStorage.getItem('sheetsConfig');
+            if (savedConfig) {
+                config = JSON.parse(savedConfig);
+                document.getElementById('sheetId').value = config.sheetId || '';
+                document.getElementById('scriptUrl').value = config.scriptUrl || '';
+                
+                if (config.sheetId && config.scriptUrl) {
+                    showMainApp();
+                    loadLinks();
+                }
+            }
+        });
+        
+        function saveConfig() {
+            const sheetId = document.getElementById('sheetId').value;
+            const scriptUrl = document.getElementById('scriptUrl').value;
+            
+            if (!sheetId || !scriptUrl) {
+                showMessage('Please enter both Sheet ID and Apps Script URL', 'error');
+                return;
+            }
+            
+            config = { sheetId, scriptUrl };
+            localStorage.setItem('sheetsConfig', JSON.stringify(config));
+            
+            showMainApp();
+            loadLinks();
+        }
+        
+        function showMainApp() {
+            document.getElementById('configSection').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+        }
+        
+		async function addLink() {
+            const url = document.getElementById('urlInput').value;
+            const title = document.getElementById('titleInput').value;
+            
+            if (!url) {
+                showMessage('Please enter a URL', 'error');
+                return;
+            }
+            
+            try {
+                // Use JSONP to avoid CORS issues
+                const callbackName = 'callback_' + Date.now();
+                const params = new URLSearchParams({
+                    action: 'add',
+                    url: url,
+                    title: title || url,
+                    callback: callbackName
+                });
+                
+                // Create promise that resolves when callback is called
+                const result = await new Promise((resolve, reject) => {
+                    // Set up callback function
+                    window[callbackName] = function(data) {
+                        resolve(data);
+                        // Cleanup
+                        delete window[callbackName];
+                        document.head.removeChild(script);
+                    };
+                    
+                    // Create script tag
+                    const script = document.createElement('script');
+                    script.src = `${config.scriptUrl}?${params.toString()}`;
+                    script.onerror = function() {
+                        reject(new Error('Network error'));
+                        delete window[callbackName];
+                        document.head.removeChild(script);
+                    };
+                    
+                    // Add timeout
+                    setTimeout(() => {
+                        if (window[callbackName]) {
+                            reject(new Error('Request timeout'));
+                            delete window[callbackName];
+                            if (document.head.contains(script)) {
+                                document.head.removeChild(script);
+                            }
+                        }
+                    }, 10000); // 10 second timeout
+                    
+                    document.head.appendChild(script);
+                });
+                
+                if (result.success) {
+                    document.getElementById('urlInput').value = '';
+                    document.getElementById('titleInput').value = '';
+                    showMessage('Link saved successfully!', 'success');
+                    loadLinks();
+                } else {
+                    throw new Error(result.error || 'Failed to save');
+                }
+            } catch (error) {
+                showMessage('Error saving link: ' + error.message, 'error');
+            }
+        }
+        
+        async function loadLinks() {
+            try {
+                // Load data from Google Sheets CSV export
+                const csvUrl = `https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv`;
+                const response = await fetch(csvUrl);
+                const csvText = await response.text();
+                
+                // Parse CSV
+                const lines = csvText.split('\n');
+                const headers = lines[0].split(',');
+                
+                allData = [];
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].trim()) {
+                        const values = parseCSVLine(lines[i]);
+                        if (values.length >= 4) {
+                            allData.push({
+                                url: values[0],
+                                title: values[1],
+                                created: values[2],
+                                archived: values[3].toLowerCase() === 'true',
+                                row: i + 1 // Row number for editing
+                            });
+                        }
+                    }
+                }
+                
+                // Separate into unread and archived
+                const unreadLinks = allData.filter(link => !link.archived);
+                const archivedLinks = allData.filter(link => link.archived);
+                
+                displayLinks('unread', unreadLinks);
+                displayLinks('archived', archivedLinks);
+                
+            } catch (error) {
+                showMessage('Error loading links: ' + error.message, 'error');
+            }
+        }
+        
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current);
+            
+            return result.map(field => field.replace(/^"|"$/g, ''));
+        }
+        
+        function displayLinks(type, links) {
+            const container = type === 'unread' ? 
+                document.getElementById('unreadTab') : 
+                document.getElementById('archivedTab');
+            
+            if (links.length === 0) {
+                container.innerHTML = '<div class="empty-state">No links here yet</div>';
+                return;
+            }
+            
+            const linksHtml = links.map(link => {
+                const created = link.created ? new Date(link.created).toLocaleDateString() : 'Unknown';
+                
+                return `
+                    <div class="link-item">
+                        <div class="link-info">
+                            <div class="link-title">
+                                <a href="${link.url}" target="_blank">${link.title || link.url}</a>
+                            </div>
+                            <div class="link-url">${link.url}</div>
+                            <div class="link-date">${created}</div>
+                        </div>
+                        <div class="link-actions">
+                            ${type === 'unread' ? 
+                                `<button class="archive" onclick="archiveLink(${link.row})">Archive</button>` : 
+                                `<button class="delete" onclick="deleteLink(${link.row})">Delete</button>`
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = linksHtml;
+        }
+        
+        async function archiveLink(row) {
+            try {
+                const response = await fetch(config.scriptUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'archive',
+                        row: row
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    loadLinks();
+                } else {
+                    throw new Error(result.error || 'Failed to archive');
+                }
+            } catch (error) {
+                showMessage('Error archiving link: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteLink(row) {
+            if (confirm('Permanently delete this link?')) {
+                try {
+                    const response = await fetch(config.scriptUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'delete',
+                            row: row
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        loadLinks();
+                    } else {
+                        throw new Error(result.error || 'Failed to delete');
+                    }
+                } catch (error) {
+                    showMessage('Error deleting link: ' + error.message, 'error');
+                }
+            }
+        }
+        
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('unreadTab').style.display = tab === 'unread' ? 'block' : 'none';
+            document.getElementById('archivedTab').style.display = tab === 'archived' ? 'block' : 'none';
+            
+            currentTab = tab;
+        }
+        
+        function showMessage(message, type) {
+            // Remove existing messages
+            document.querySelectorAll('.error, .success').forEach(el => el.remove());
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(messageDiv, container.children[1]);
+            
+            setTimeout(() => messageDiv.remove(), 5000);
+        }
+        
+        // Allow Enter key to submit
+        document.getElementById('urlInput')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addLink();
+            }
+        });
+    </script>
+</body>
+</html>
