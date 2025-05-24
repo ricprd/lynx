@@ -480,27 +480,61 @@
         
         async function archiveLink(row) {
             try {
-                const response = await fetch(config.scriptUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json' // Added header for CORS
-                    },
-                    body: JSON.stringify({
-                        action: 'archive',
-                        row: row
-                    })
+                // Use JSONP to avoid CORS issues, similar to addLink
+                const callbackName = 'callback_' + Date.now();
+                const params = new URLSearchParams({
+                    action: 'archive',
+                    row: row,
+                    callback: callbackName
                 });
-                
-                const result = await response.json();
-                
+
+                // Create promise that resolves when callback is called
+                const result = await new Promise((resolve, reject) => {
+                    // Set up callback function
+                    window[callbackName] = function(data) {
+                        resolve(data);
+                        // Cleanup
+                        delete window[callbackName];
+                        if (document.head.contains(script)) {
+                           document.head.removeChild(script);
+                        }
+                    };
+                    
+                    // Create script tag
+                    const script = document.createElement('script');
+                    script.src = `${config.scriptUrl}?${params.toString()}`;
+                    script.onerror = function() {
+                        reject(new Error('Network error during archive'));
+                        delete window[callbackName];
+                        if (document.head.contains(script)) {
+                           document.head.removeChild(script);
+                        }
+                    };
+                    
+                    // Add timeout
+                    setTimeout(() => {
+                        if (window[callbackName]) {
+                            reject(new Error('Archive request timeout'));
+                            delete window[callbackName];
+                            if (document.head.contains(script)) {
+                                document.head.removeChild(script);
+                            }
+                        }
+                    }, 10000); // 10 second timeout
+                    
+                    document.head.appendChild(script);
+                });
+
                 if (result.success) {
-                    loadLinks();
+                    showMessage('Link archived successfully!', 'success'); // Optional success message
+                    loadLinks(); // Reload links to reflect the change
                 } else {
                     throw new Error(result.error || 'Failed to archive');
                 }
             } catch (error) {
                 showMessage('Error archiving link: ' + error.message, 'error');
             }
+        }
         }
         
         async function deleteLink(row) {
