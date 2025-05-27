@@ -1,11 +1,63 @@
+function fetchPageTitle(url) {
+  try {
+    // Set options for UrlFetchApp to handle potential issues
+    var options = {
+      'muteHttpExceptions': true, // Prevent script termination on HTTP errors
+      'followRedirects': true,    // Follow redirects
+      'validateHttpsCertificates': true // Validate HTTPS certificates
+    };
+
+    var response = UrlFetchApp.fetch(url, options);
+    var responseCode = response.getResponseCode();
+
+    if (responseCode >= 200 && responseCode < 300) {
+      var content = response.getContentText();
+      var titleMatch = content.match(/<title[^>]*>([^<]+)<\/title>/i);
+      if (titleMatch && titleMatch[1]) {
+        var extractedTitle = titleMatch[1].trim();
+        return extractedTitle === '' ? url : extractedTitle;
+      } else {
+        Logger.log('No title tag found for: ' + url);
+        return url;
+      }
+    } else {
+      Logger.log('Failed to fetch URL: ' + url + ' - Response Code: ' + responseCode);
+      return url;
+    }
+  } catch (error) {
+    Logger.log('Error fetching title for URL: ' + url + ' - Error: ' + error.toString());
+    return url;
+  }
+}
+
+// Function to handle OPTIONS preflight requests for CORS
+function doOptions(e) {
+  return ContentService.createTextOutput()
+    .setMimeType(ContentService.MimeType.TEXT) // Can be TEXT or JSON
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*', // IMPORTANT: Restrict this in production!
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', // Allow POST and OPTIONS
+      'Access-Control-Allow-Headers': 'Content-Type' // Allow Content-Type header
+    });
+}
+
 function doPost(e) {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
     const data = JSON.parse(e.postData.contents);
     
     if (data.action === 'add') {
+      const url = data.url;
+      let title = data.title;
       const timestamp = new Date().toISOString();
-      sheet.appendRow([data.url, data.title, timestamp, false]);
+
+      if (!title || title.trim() === '' || title.trim() === url.trim()) {
+        Logger.log('Title missing or same as URL, attempting to fetch for: ' + url);
+        title = fetchPageTitle(url);
+        Logger.log('Using title: ' + title);
+      }
+
+      sheet.appendRow([url, title, timestamp, false]);
       return createCORSResponse({success: true});
         
     } else if (data.action === 'archive') {
@@ -20,6 +72,7 @@ function doPost(e) {
     }
     
   } catch (error) {
+    Logger.log('Error in doPost: ' + error.toString());
     return createCORSResponse({error: error.toString()});
   }
 }
@@ -30,10 +83,18 @@ function doGet(e) {
     const params = e.parameter;
     
     if (params.action === 'add') {
+      const url = params.url;
+      let title = params.title;
       const timestamp = new Date().toISOString();
-      sheet.appendRow([params.url, params.title, timestamp, false]);
+
+      if (!title || title.trim() === '' || title.trim() === url.trim()) {
+        Logger.log('Title missing or same as URL, attempting to fetch for: ' + url);
+        title = fetchPageTitle(url);
+        Logger.log('Using title: ' + title);
+      }
+
+      sheet.appendRow([url, title, timestamp, false]);
       
-      // Handle JSONP callback
       if (params.callback) {
         return ContentService
           .createTextOutput(`${params.callback}(${JSON.stringify({success: true})})`)
@@ -65,6 +126,18 @@ function doGet(e) {
       }
       
       return createCORSResponse({success: true});
+
+    } else if (params.action === 'unarchive') { // New action
+      const rowNum = parseInt(params.row);
+      sheet.getRange(rowNum, 4).setValue(false); // Set archived to FALSE
+
+      if (params.callback) {
+        return ContentService
+          .createTextOutput(`${params.callback}(${JSON.stringify({success: true})})`)
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+
+      return createCORSResponse({success: true});
     }
     
     const errorResponse = {error: 'No valid action specified'};
@@ -77,6 +150,7 @@ function doGet(e) {
     return createCORSResponse(errorResponse);
     
   } catch (error) {
+    Logger.log('Error in doGet: ' + error.toString());
     const errorResponse = {error: error.toString()};
     
     if (e.parameter.callback) {
@@ -94,7 +168,7 @@ function createCORSResponse(data) {
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON)
     .setHeaders({
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': '*', // IMPORTANT: Restrict this in production!
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     });
