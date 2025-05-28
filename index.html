@@ -229,22 +229,6 @@
             color: #7f8c8d;
         }
         
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        
-        .success {
-            background: #d1edff;
-            color: #0c5460;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        
         .help {
             font-size: 11px;
             color: #666;
@@ -277,9 +261,67 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        /* Floating notification styles */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .notification {
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-size: 14px;
+            font-weight: 500;
+            max-width: 400px;
+            text-align: center;
+            pointer-events: auto;
+            transform: translateY(-20px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .notification.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .notification.success {
+            background: #d1edff;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        /* Mobile responsiveness for notifications */
+        @media (max-width: 600px) {
+            .notification-container {
+                left: 20px;
+                right: 20px;
+                transform: none;
+            }
+            
+            .notification {
+                max-width: none;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Floating notification container -->
+    <div class="notification-container" id="notificationContainer"></div>
+
     <div class="container">
         <div class="header">
             <h1>Lynx</h1>
@@ -505,8 +547,6 @@
             showMessage('Logged out successfully', 'success');
         }
 
-
-
         // Function to fetch page title using Edge Function
         async function fetchPageTitle(url) {
             if (!supabase) {
@@ -711,17 +751,32 @@
             currentTab = tab;
         }
 
+        // New floating notification system
         function showMessage(message, type) {
-            document.querySelectorAll('.error, .success').forEach(el => el.remove());
+            const container = document.getElementById('notificationContainer');
             
-            const messageDiv = document.createElement('div');
-            messageDiv.className = type;
-            messageDiv.textContent = message;
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
             
-            const container = document.querySelector('.container');
-            container.insertBefore(messageDiv, container.children[1]);
+            // Add to container
+            container.appendChild(notification);
             
-            setTimeout(() => messageDiv.remove(), 5000);
+            // Trigger show animation
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+            
+            // Auto-remove after 4 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300); // Wait for fade out animation
+            }, 4000);
         }
 
         // Allow Enter key to submit
