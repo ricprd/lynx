@@ -73,7 +73,7 @@
             margin-bottom: 15px;
         }
         
-        input[type="url"], input[type="text"] {
+        input[type="url"], input[type="text"], input[type="email"], input[type="password"] {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
@@ -121,13 +121,24 @@
         }
 
         button.readd {
-            background: #3498db; /* Blue */
+            background: #3498db;
             padding: 5px 10px;
             font-size: 12px;
         }
 
         button.readd:hover {
             background: #2980b9;
+        }
+
+        button.logout {
+            background: #95a5a6;
+            padding: 5px 10px;
+            font-size: 12px;
+            float: right;
+        }
+
+        button.logout:hover {
+            background: #7f8c8d;
         }
         
         .tabs {
@@ -170,7 +181,7 @@
         
         .link-info {
             flex: 1;
-            min-width: 0; /* Added to prevent overflow with long URLs */
+            min-width: 0;
         }
         
         .link-title {
@@ -180,7 +191,13 @@
         }
 
         .link-title a {
-            word-break: break-all; /* Add this to wrap long titles/URLs */
+            word-break: break-all;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .link-title a:hover {
+            text-decoration: underline;
         }
         
         .link-url {
@@ -233,6 +250,33 @@
             color: #666;
             margin-top: 5px;
         }
+
+        .auth-form {
+            padding: 20px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .auth-toggle {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .auth-toggle a {
+            color: #3498db;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .user-info {
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -242,25 +286,65 @@
             <p>Cat-like link saver</p>
         </div>
         
+        <!-- Configuration Section -->
         <div class="config" id="configSection">
             <h3>Setup Required</h3>
-            <p>Enter your Google Sheets information:</p>
+            <p>Enter your Supabase project information:</p>
             <div class="config-form">
                 <div class="config-group">
-                    <label for="sheetId">Sheet ID:</label>
-                    <input type="text" id="sheetId" placeholder="From your sheet URL...">
-                    <div class="help">Found in your sheet URL between /d/ and /edit</div>
+                    <label for="supabaseUrl">Supabase URL:</label>
+                    <input type="text" id="supabaseUrl" placeholder="https://your-project.supabase.co">
+                    <div class="help">Your project URL from Supabase dashboard</div>
                 </div>
                 <div class="config-group">
-                    <label for="scriptUrl">Apps Script URL:</label>
-                    <input type="text" id="scriptUrl" placeholder="Your deployed web app URL...">
-                    <div class="help">From Apps Script deployment</div>
+                    <label for="supabaseKey">Supabase Anon Key:</label>
+                    <input type="text" id="supabaseKey" placeholder="Your public anon key...">
+                    <div class="help">Public anon key from Supabase dashboard</div>
                 </div>
-                <button onclick="saveConfig()">Save & Load</button>
+                <button onclick="saveConfig()">Save & Continue</button>
+            </div>
+        </div>
+
+        <!-- Authentication Section -->
+        <div id="authSection" style="display: none;">
+            <div class="auth-form">
+                <div id="loginForm">
+                    <h3>Login</h3>
+                    <div class="form-group">
+                        <input type="email" id="loginEmail" placeholder="Email" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="loginPassword" placeholder="Password" required>
+                    </div>
+                    <button onclick="login()">Login</button>
+                    <div class="auth-toggle">
+                        Don't have an account? <a onclick="showSignup()">Sign up</a>
+                    </div>
+                </div>
+
+                <div id="signupForm" style="display: none;">
+                    <h3>Sign Up</h3>
+                    <div class="form-group">
+                        <input type="email" id="signupEmail" placeholder="Email" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="signupPassword" placeholder="Password (min 6 characters)" required>
+                    </div>
+                    <button onclick="signup()">Sign Up</button>
+                    <div class="auth-toggle">
+                        Already have an account? <a onclick="showLogin()">Login</a>
+                    </div>
+                </div>
             </div>
         </div>
         
+        <!-- Main App -->
         <div id="mainApp" style="display: none;">
+            <div class="user-info" id="userInfo">
+                <span>Welcome back!</span>
+                <button class="logout" onclick="logout()">Logout</button>
+            </div>
+
             <div class="add-form">
                 <div class="form-group">
                     <input type="url" id="urlInput" placeholder="Paste URL here..." required>
@@ -277,7 +361,7 @@
             </div>
             
             <div id="unreadTab" class="links-container">
-                <div class="loading">Click "Save & Load" above to get started</div>
+                <div class="loading">Loading your links...</div>
             </div>
             
             <div id="archivedTab" class="links-container" style="display: none;">
@@ -286,48 +370,142 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         let currentTab = 'unread';
-        let config = {};
-        let allData = [];
+        let supabase = null;
+        let currentUser = null;
+        let allLinks = [];
         
-        // Load saved config on page load
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            const savedConfig = localStorage.getItem('sheetsConfig');
-            if (savedConfig) {
-                config = JSON.parse(savedConfig);
-                document.getElementById('sheetId').value = config.sheetId || '';
-                document.getElementById('scriptUrl').value = config.scriptUrl || '';
-                
-                if (config.sheetId && config.scriptUrl) {
-                    showMainApp();
-                    loadLinks();
-                }
+            const savedConfig = JSON.parse(localStorage.getItem('supabaseConfig') || '{}');
+            if (savedConfig.url && savedConfig.key) {
+                document.getElementById('supabaseUrl').value = savedConfig.url;
+                document.getElementById('supabaseKey').value = savedConfig.key;
+                initializeSupabase(savedConfig.url, savedConfig.key);
             }
         });
-        
+
         function saveConfig() {
-            const sheetId = document.getElementById('sheetId').value;
-            const scriptUrl = document.getElementById('scriptUrl').value;
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
             
-            if (!sheetId || !scriptUrl) {
-                showMessage('Please enter both Sheet ID and Apps Script URL', 'error');
+            if (!url || !key) {
+                showMessage('Please enter both Supabase URL and API key', 'error');
                 return;
             }
             
-            config = { sheetId, scriptUrl };
-            localStorage.setItem('sheetsConfig', JSON.stringify(config));
-            
-            showMainApp();
-            loadLinks();
+            localStorage.setItem('supabaseConfig', JSON.stringify({ url, key }));
+            initializeSupabase(url, key);
         }
-        
+
+        function initializeSupabase(url, key) {
+            try {
+                supabase = supabase.createClient(url, key);
+                document.getElementById('configSection').style.display = 'none';
+                checkAuthState();
+            } catch (error) {
+                showMessage('Invalid Supabase configuration: ' + error.message, 'error');
+            }
+        }
+
+        async function checkAuthState() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                currentUser = user;
+                showMainApp();
+                loadLinks();
+            } else {
+                showAuthSection();
+            }
+        }
+
+        function showAuthSection() {
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('mainApp').style.display = 'none';
+        }
+
         function showMainApp() {
-            document.getElementById('configSection').style.display = 'none';
+            document.getElementById('authSection').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('userInfo').querySelector('span').textContent = 
+                `Welcome back, ${currentUser.email}!`;
         }
-        
-		async function addLink() {
+
+        function showLogin() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('signupForm').style.display = 'none';
+        }
+
+        function showSignup() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('signupForm').style.display = 'block';
+        }
+
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                showMessage('Please enter email and password', 'error');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) throw error;
+
+                currentUser = data.user;
+                showMainApp();
+                loadLinks();
+                showMessage('Logged in successfully!', 'success');
+            } catch (error) {
+                showMessage('Login failed: ' + error.message, 'error');
+            }
+        }
+
+        async function signup() {
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            
+            if (!email || !password) {
+                showMessage('Please enter email and password', 'error');
+                return;
+            }
+
+            if (password.length < 6) {
+                showMessage('Password must be at least 6 characters', 'error');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password
+                });
+
+                if (error) throw error;
+
+                showMessage('Account created! Please check your email to verify your account.', 'success');
+                showLogin();
+            } catch (error) {
+                showMessage('Signup failed: ' + error.message, 'error');
+            }
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            currentUser = null;
+            showAuthSection();
+            showMessage('Logged out successfully', 'success');
+        }
+
+        async function addLink() {
             const url = document.getElementById('urlInput').value;
             const title = document.getElementById('titleInput').value;
             
@@ -335,125 +513,55 @@
                 showMessage('Please enter a URL', 'error');
                 return;
             }
-            
+
             try {
-                // Use JSONP to avoid CORS issues
-                const callbackName = 'callback_' + Date.now();
-                const params = new URLSearchParams({
-                    action: 'add',
-                    url: url,
-                    title: title || url,
-                    callback: callbackName
-                });
-                
-                // Create promise that resolves when callback is called
-                const result = await new Promise((resolve, reject) => {
-                    // Set up callback function
-                    window[callbackName] = function(data) {
-                        resolve(data);
-                        // Cleanup
-                        delete window[callbackName];
-                        document.head.removeChild(script);
-                    };
-                    
-                    // Create script tag
-                    const script = document.createElement('script');
-                    script.src = `${config.scriptUrl}?${params.toString()}`;
-                    script.onerror = function() {
-                        reject(new Error('Network error'));
-                        delete window[callbackName];
-                        document.head.removeChild(script);
-                    };
-                    
-                    // Add timeout
-                    setTimeout(() => {
-                        if (window[callbackName]) {
-                            reject(new Error('Request timeout'));
-                            delete window[callbackName];
-                            if (document.head.contains(script)) {
-                                document.head.removeChild(script);
-                            }
+                const { data, error } = await supabase
+                    .from('links')
+                    .insert([
+                        {
+                            url: url,
+                            title: title || url,
+                            user_id: currentUser.id
                         }
-                    }, 10000); // 10 second timeout
-                    
-                    document.head.appendChild(script);
-                });
-                
-                if (result.success) {
-                    document.getElementById('urlInput').value = '';
-                    document.getElementById('titleInput').value = '';
-                    showMessage('Link saved successfully!', 'success');
-                    loadLinks();
-                } else {
-                    throw new Error(result.error || 'Failed to save');
-                }
+                    ]);
+
+                if (error) throw error;
+
+                document.getElementById('urlInput').value = '';
+                document.getElementById('titleInput').value = '';
+                showMessage('Link saved successfully!', 'success');
+                loadLinks();
             } catch (error) {
                 showMessage('Error saving link: ' + error.message, 'error');
             }
         }
-        
+
         async function loadLinks() {
             try {
-                // Load data from Google Sheets CSV export
-                const csvUrl = `https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv`;
-                const response = await fetch(csvUrl);
-                const csvText = await response.text();
-                
-                // Parse CSV
-                const lines = csvText.split('\n');
-                const headers = lines[0].split(',');
-                
-                allData = [];
-                for (let i = 1; i < lines.length; i++) {
-                    if (lines[i].trim()) {
-                        const values = parseCSVLine(lines[i]);
-                        if (values.length >= 4) {
-                            allData.push({
-                                url: values[0],
-                                title: values[1],
-                                created: values[2],
-                                archived: values[3].toLowerCase() === 'true',
-                                row: i + 1 // Row number for editing
-                            });
-                        }
-                    }
-                }
-                
-                // Separate into unread and archived
-                const unreadLinks = allData.filter(link => !link.archived);
-                const archivedLinks = allData.filter(link => link.archived);
-                
-                displayLinks('unread', unreadLinks);
-                displayLinks('archived', archivedLinks);
-                
+                const { data, error } = await supabase
+                    .from('links')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                allLinks = data || [];
+                displayLinks();
             } catch (error) {
                 showMessage('Error loading links: ' + error.message, 'error');
             }
         }
-        
-        function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
+
+        function displayLinks() {
+            const unreadLinks = allLinks.filter(link => !link.archived);
+            const archivedLinks = allLinks.filter(link => link.archived);
             
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current);
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            result.push(current);
-            
-            return result.map(field => field.replace(/^"|"$/g, ''));
+            displayLinkList('unread', unreadLinks);
+            displayLinkList('archived', archivedLinks);
         }
-        
-        function displayLinks(type, links) {
+
+        function displayLinkList(type, links) {
             const container = type === 'unread' ? 
                 document.getElementById('unreadTab') : 
                 document.getElementById('archivedTab');
@@ -464,23 +572,22 @@
             }
             
             const linksHtml = links.map(link => {
-                const created = link.created ? new Date(link.created).toLocaleDateString() : 'Unknown';
+                const created = new Date(link.created_at).toLocaleDateString();
                 
                 return `
                     <div class="link-item">
                         <div class="link-info">
                             <div class="link-title">
-                                <a href="${link.url}" target="_blank">${link.title || link.url}</a>
+                                <a href="${link.url}" target="_blank">${link.title}</a>
                             </div>
                             <div class="link-url">${link.url}</div>
                             <div class="link-date">${created}</div>
                         </div>
                         <div class="link-actions">
                             ${type === 'unread' ? 
-                                `<button class="archive" onclick="archiveLink(${link.row})">Archive</button>` : 
-                                `<!-- Archived link actions -->
-                                 <button class="readd" onclick="unarchiveLink(${link.row})">Re-add</button>
-                                 <button class="delete" onclick="deleteLink(${link.row})">Delete</button>`
+                                `<button class="archive" onclick="archiveLink(${link.id})">Archive</button>` : 
+                                `<button class="readd" onclick="unarchiveLink(${link.id})">Re-add</button>
+                                 <button class="delete" onclick="deleteLink(${link.id})">Delete</button>`
                             }
                         </div>
                     </div>
@@ -489,183 +596,60 @@
             
             container.innerHTML = linksHtml;
         }
-        
-        async function archiveLink(row) {
+
+        async function archiveLink(id) {
             try {
-                // Use JSONP to avoid CORS issues, similar to addLink
-                const callbackName = 'callback_' + Date.now();
-                const params = new URLSearchParams({
-                    action: 'archive',
-                    row: row,
-                    callback: callbackName
-                });
+                const { error } = await supabase
+                    .from('links')
+                    .update({ archived: true })
+                    .eq('id', id)
+                    .eq('user_id', currentUser.id);
 
-                // Create promise that resolves when callback is called
-                const result = await new Promise((resolve, reject) => {
-                    // Set up callback function
-                    window[callbackName] = function(data) {
-                        resolve(data);
-                        // Cleanup
-                        delete window[callbackName];
-                        if (document.head.contains(script)) {
-                           document.head.removeChild(script);
-                        }
-                    };
-                    
-                    // Create script tag
-                    const script = document.createElement('script');
-                    script.src = `${config.scriptUrl}?${params.toString()}`;
-                    script.onerror = function() {
-                        reject(new Error('Network error during archive'));
-                        delete window[callbackName];
-                        if (document.head.contains(script)) {
-                           document.head.removeChild(script);
-                        }
-                    };
-                    
-                    // Add timeout
-                    setTimeout(() => {
-                        if (window[callbackName]) {
-                            reject(new Error('Archive request timeout'));
-                            delete window[callbackName];
-                            if (document.head.contains(script)) {
-                                document.head.removeChild(script);
-                            }
-                        }
-                    }, 10000); // 10 second timeout
-                    
-                    document.head.appendChild(script);
-                });
+                if (error) throw error;
 
-                if (result.success) {
-                    showMessage('Link archived successfully!', 'success'); // Optional success message
-                    loadLinks(); // Reload links to reflect the change
-                } else {
-                    throw new Error(result.error || 'Failed to archive');
-                }
+                showMessage('Link archived!', 'success');
+                loadLinks();
             } catch (error) {
                 showMessage('Error archiving link: ' + error.message, 'error');
             }
         }
-        
-        async function deleteLink(row) {
-            if (confirm('Permanently delete this link?')) {
-                try {
-                    // Use JSONP to avoid CORS issues, similar to addLink/archiveLink
-                    const callbackName = 'callback_' + Date.now();
-                    const params = new URLSearchParams({
-                        action: 'delete',
-                        row: row,
-                        callback: callbackName
-                    });
 
-                    // Create promise that resolves when callback is called
-                    const result = await new Promise((resolve, reject) => {
-                        // Set up callback function
-                        window[callbackName] = function(data) {
-                            resolve(data);
-                            // Cleanup
-                            delete window[callbackName];
-                            if (document.head.contains(script)) {
-                               document.head.removeChild(script);
-                            }
-                        };
-
-                        // Create script tag
-                        const script = document.createElement('script');
-                        script.src = `${config.scriptUrl}?${params.toString()}`;
-                        script.onerror = function() {
-                            reject(new Error('Network error during delete'));
-                            delete window[callbackName];
-                            if (document.head.contains(script)) {
-                               document.head.removeChild(script);
-                            }
-                        };
-
-                        // Add timeout
-                        setTimeout(() => {
-                            if (window[callbackName]) {
-                                reject(new Error('Delete request timeout'));
-                                delete window[callbackName];
-                                if (document.head.contains(script)) {
-                                    document.head.removeChild(script);
-                                }
-                            }
-                        }, 10000); // 10 second timeout
-
-                        document.head.appendChild(script);
-                    });
-
-                    if (result.success) {
-                        showMessage('Link deleted successfully!', 'success'); // Optional success message
-                        loadLinks(); // Reload links to reflect the change
-                    } else {
-                        throw new Error(result.error || 'Failed to delete');
-                    }
-                } catch (error) {
-                    showMessage('Error deleting link: ' + error.message, 'error');
-                }
-            }
-        }
-
-        async function unarchiveLink(row) {
+        async function unarchiveLink(id) {
             try {
-                // Use JSONP to avoid CORS issues
-                const callbackName = 'callback_' + Date.now();
-                const params = new URLSearchParams({
-                    action: 'unarchive',
-                    row: row,
-                    callback: callbackName
-                });
+                const { error } = await supabase
+                    .from('links')
+                    .update({ archived: false })
+                    .eq('id', id)
+                    .eq('user_id', currentUser.id);
 
-                // Create promise that resolves when callback is called
-                const result = await new Promise((resolve, reject) => {
-                    // Set up callback function
-                    window[callbackName] = function(data) {
-                        resolve(data);
-                        // Cleanup
-                        delete window[callbackName];
-                        if (document.head.contains(script)) {
-                           document.head.removeChild(script);
-                        }
-                    };
+                if (error) throw error;
 
-                    // Create script tag
-                    const script = document.createElement('script');
-                    script.src = `${config.scriptUrl}?${params.toString()}`;
-                    script.onerror = function() {
-                        reject(new Error('Network error during unarchive'));
-                        delete window[callbackName];
-                        if (document.head.contains(script)) {
-                           document.head.removeChild(script);
-                        }
-                    };
-
-                    // Add timeout
-                    setTimeout(() => {
-                        if (window[callbackName]) {
-                            reject(new Error('Unarchive request timeout'));
-                            delete window[callbackName];
-                            if (document.head.contains(script)) {
-                                document.head.removeChild(script);
-                            }
-                        }
-                    }, 10000); // 10 second timeout
-
-                    document.head.appendChild(script);
-                });
-
-                if (result.success) {
-                    showMessage('Link moved back to To Read!', 'success');
-                    loadLinks(); // Reload links to reflect the change
-                } else {
-                    throw new Error(result.error || 'Failed to unarchive');
-                }
+                showMessage('Link moved back to To Read!', 'success');
+                loadLinks();
             } catch (error) {
                 showMessage('Error unarchiving link: ' + error.message, 'error');
             }
         }
-        
+
+        async function deleteLink(id) {
+            if (!confirm('Permanently delete this link?')) return;
+
+            try {
+                const { error } = await supabase
+                    .from('links')
+                    .delete()
+                    .eq('id', id)
+                    .eq('user_id', currentUser.id);
+
+                if (error) throw error;
+
+                showMessage('Link deleted!', 'success');
+                loadLinks();
+            } catch (error) {
+                showMessage('Error deleting link: ' + error.message, 'error');
+            }
+        }
+
         function showTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
@@ -675,9 +659,8 @@
             
             currentTab = tab;
         }
-        
+
         function showMessage(message, type) {
-            // Remove existing messages
             document.querySelectorAll('.error, .success').forEach(el => el.remove());
             
             const messageDiv = document.createElement('div');
@@ -689,11 +672,22 @@
             
             setTimeout(() => messageDiv.remove(), 5000);
         }
-        
+
         // Allow Enter key to submit
         document.getElementById('urlInput')?.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 addLink();
+            }
+        });
+
+        // Auth form enter key support
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                if (document.getElementById('loginForm').style.display !== 'none') {
+                    login();
+                } else if (document.getElementById('signupForm').style.display !== 'none') {
+                    signup();
+                }
             }
         });
     </script>
