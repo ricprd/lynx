@@ -402,7 +402,7 @@
 
         function initializeSupabase(url, key) {
             try {
-                supabase = supabase.createClient(url, key);
+                supabase = window.supabase.createClient(url, key);
                 document.getElementById('configSection').style.display = 'none';
                 checkAuthState();
             } catch (error) {
