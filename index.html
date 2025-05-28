@@ -277,13 +277,6 @@
             justify-content: space-between;
             align-items: center;
         }
-
-        .fetching-title {
-            color: #666;
-            font-style: italic;
-            font-size: 12px;
-            margin-top: 5px;
-        }
     </style>
 </head>
 <body>
@@ -355,10 +348,9 @@
             <div class="add-form">
                 <div class="form-group">
                     <input type="url" id="urlInput" placeholder="Paste URL here..." required>
-                    <div id="titleStatus" class="fetching-title" style="display: none;">Fetching title...</div>
                 </div>
                 <div class="form-group">
-                    <input type="text" id="titleInput" placeholder="Optional title (auto-filled if left empty)...">
+                    <input type="text" id="titleInput" placeholder="Optional title...">
                 </div>
                 <button onclick="addLink()" id="saveButton">Save Link</button>
             </div>
@@ -384,7 +376,6 @@
         let supabase = null;
         let currentUser = null;
         let allLinks = [];
-        let isAutoFetchingTitle = false;
         
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -393,15 +384,6 @@
                 document.getElementById('supabaseUrl').value = savedConfig.url;
                 document.getElementById('supabaseKey').value = savedConfig.key;
                 initializeSupabase(savedConfig.url, savedConfig.key);
-            }
-
-            // Add URL input event listener for auto title fetching
-            const urlInput = document.getElementById('urlInput');
-            if (urlInput) {
-                urlInput.addEventListener('input', debounce(handleUrlInput, 1000));
-                urlInput.addEventListener('paste', function(e) {
-                    setTimeout(() => handleUrlInput(), 100);
-                });
             }
         });
 
@@ -523,50 +505,7 @@
             showMessage('Logged out successfully', 'success');
         }
 
-        // New function to handle URL input and auto-fetch titles
-        async function handleUrlInput() {
-            const urlInput = document.getElementById('urlInput');
-            const titleInput = document.getElementById('titleInput');
-            const titleStatus = document.getElementById('titleStatus');
-            const url = urlInput.value.trim();
 
-            // Only auto-fetch if URL exists and title field is empty
-            if (!url || titleInput.value.trim() || isAutoFetchingTitle) {
-                return;
-            }
-
-            // Basic URL validation
-            try {
-                new URL(url);
-            } catch {
-                return; // Invalid URL, don't fetch
-            }
-
-            isAutoFetchingTitle = true;
-            titleStatus.style.display = 'block';
-            titleStatus.textContent = 'Fetching title...';
-
-            try {
-                const title = await fetchPageTitle(url);
-                if (title && !titleInput.value.trim()) {
-                    titleInput.value = title;
-                    titleStatus.textContent = 'Title found!';
-                    setTimeout(() => {
-                        titleStatus.style.display = 'none';
-                    }, 2000);
-                } else {
-                    titleStatus.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Error fetching title:', error);
-                titleStatus.textContent = 'Could not fetch title';
-                setTimeout(() => {
-                    titleStatus.style.display = 'none';
-                }, 3000);
-            } finally {
-                isAutoFetchingTitle = false;
-            }
-        }
 
         // Function to fetch page title using Edge Function
         async function fetchPageTitle(url) {
@@ -585,7 +524,7 @@
             return data?.title || null;
         }
 
-        // Debounce function to limit API calls
+        // Debounce function (keeping for potential future use)
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -638,7 +577,6 @@
 
                 document.getElementById('urlInput').value = '';
                 document.getElementById('titleInput').value = '';
-                document.getElementById('titleStatus').style.display = 'none';
                 showMessage('Link saved successfully!', 'success');
                 loadLinks();
             } catch (error) {
