@@ -274,6 +274,44 @@
             border: 1px solid #bee5eb;
         }
 
+        /* Loading state styles - hide content until auth check is complete */
+        body.app-loading #authSection,
+        body.app-loading #mainApp {
+            display: none !important;
+        }
+
+        .app-loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 60px 20px;
+            color: #7f8c8d;
+        }
+
+        body.app-loading .app-loading-spinner {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #ecf0f1;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Initially hide auth and main sections */
+        #authSection,
+        #mainApp {
+            display: none;
+        }
+
         /* Mobile responsiveness for notifications */
         @media (max-width: 600px) {
             .notification-container {
@@ -288,7 +326,7 @@
         }
     </style>
 </head>
-<body>
+<body class="app-loading">
     <!-- Floating notification container -->
     <div class="notification-container" id="notificationContainer"></div>
 
@@ -296,6 +334,12 @@
         <div class="header">
             <h1>Lynx</h1>
             <p>Cat-like link saver</p>
+        </div>
+        
+        <!-- Loading state -->
+        <div class="app-loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading...</p>
         </div>
         
         <!-- Authentication Section -->
@@ -332,7 +376,7 @@
         </div>
         
         <!-- Main App -->
-        <div id="mainApp" style="display: none;">
+        <div id="mainApp">
             <div class="user-info" id="userInfo">
                 <span>Welcome back!</span>
                 <button class="logout" onclick="logout()">Logout</button>
@@ -384,19 +428,33 @@
                 supabase = window.supabase.createClient(url, key);
                 checkAuthState();
             } catch (error) {
+                hideLoadingState();
                 showMessage('Invalid Supabase configuration: ' + error.message, 'error');
+                showAuthSection();
             }
         }
 
         async function checkAuthState() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                currentUser = user;
-                showMainApp();
-                loadLinks();
-            } else {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                hideLoadingState();
+                
+                if (user) {
+                    currentUser = user;
+                    showMainApp();
+                    loadLinks();
+                } else {
+                    showAuthSection();
+                }
+            } catch (error) {
+                hideLoadingState();
+                showMessage('Error checking authentication: ' + error.message, 'error');
                 showAuthSection();
             }
+        }
+
+        function hideLoadingState() {
+            document.body.classList.remove('app-loading');
         }
 
         function showAuthSection() {
