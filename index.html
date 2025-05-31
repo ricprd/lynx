@@ -773,20 +773,34 @@
             }, 4000);
         }
 
-        // Allow Enter key to submit
-        document.getElementById('urlInput')?.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                addLink();
+        // FIXED: Allow Enter key to submit - with proper event handling
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlInput = document.getElementById('urlInput');
+            if (urlInput) {
+                urlInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault(); // Prevent default form submission
+                        e.stopPropagation(); // Stop event from bubbling up
+                        addLink();
+                    }
+                });
             }
         });
 
-        // Auth form enter key support
+        // FIXED: Auth form enter key support - with better visibility check
         document.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                if (document.getElementById('loginForm').style.display !== 'none') {
-                    login();
-                } else if (document.getElementById('signupForm').style.display !== 'none') {
-                    signup();
+                const loginForm = document.getElementById('loginForm');
+                const signupForm = document.getElementById('signupForm');
+                const authSection = document.getElementById('authSection');
+                
+                // Only handle auth form enters if auth section is actually visible
+                if (authSection && authSection.style.display === 'block') {
+                    if (loginForm && loginForm.style.display !== 'none') {
+                        login();
+                    } else if (signupForm && signupForm.style.display !== 'none') {
+                        signup();
+                    }
                 }
             }
         });
