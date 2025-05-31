@@ -1,6 +1,6 @@
 {
-  "name": "MyWebSite",
-  "short_name": "MySite",
+  "name": "Lynx",
+  "short_name": "Lynx",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
